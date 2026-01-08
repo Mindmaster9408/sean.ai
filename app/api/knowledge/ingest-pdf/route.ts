@@ -3,15 +3,21 @@ import prisma from "@/lib/db";
 import { getUserFromRequest, unauthorized } from "@/lib/api-auth";
 import { generateCitationId, generateSlug } from "@/lib/kb";
 
-// Use require to avoid TypeScript resolution issues with pdf-parse
-// This will be called at runtime
-function getPdfParser() {
+// Load pdf-parse at runtime to avoid build-time resolution issues
+async function getPdfParser() {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require("pdf-parse");
-  } catch (e) {
-    console.error("Failed to load pdf-parse:", e);
-    throw new Error(`PDF parser not available: ${e}`);
+    const pdfParse = await import("pdf-parse");
+    // pdf-parse exports the function as default
+    // @ts-ignore
+    if (typeof pdfParse.default === "function") {
+      // @ts-ignore
+      return pdfParse.default;
+    }
+    // Last resort - return the whole module
+    return pdfParse;
+  } catch (error) {
+    console.error("Failed to load pdf-parse:", error);
+    throw new Error(`Failed to initialize PDF parser`);
   }
 }
 
@@ -124,7 +130,7 @@ export async function POST(request: NextRequest) {
     // Get PDF parser
     let pdfParse;
     try {
-      pdfParse = getPdfParser();
+      pdfParse = await getPdfParser();
     } catch (error) {
       console.error("Failed to load PDF parser:", error);
       return NextResponse.json(
