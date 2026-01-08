@@ -308,7 +308,7 @@ export default function KnowledgePage() {
           {tab === "pdf" && (
             <form onSubmit={handleIngestPdf} className="mb-6">
               <div className="flex gap-2">
-                <label className="flex-1 flex items-center justify-center px-4 py-3 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition">
+                <label title="Select PDF file" className="flex-1 flex items-center justify-center px-4 py-3 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition">
                   <input
                     type="file"
                     accept=".pdf"
@@ -348,7 +348,7 @@ export default function KnowledgePage() {
               </label>
               <select
                 value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
+                onChange={(e) => setStatus(e.target.value as "pending" | "approved" | "rejected" | "all")}
                 className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="pending">Pending</option>

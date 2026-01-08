@@ -8,9 +8,9 @@ async function getPdfParser() {
   try {
     const pdfParse = await import("pdf-parse");
     // pdf-parse exports the function as default
-    // @ts-ignore
+    // @ts-expect-error
     if (typeof pdfParse.default === "function") {
-      // @ts-ignore
+      // @ts-expect-error
       return pdfParse.default;
     }
     // Last resort - return the whole module
@@ -212,10 +212,10 @@ export async function POST(request: NextRequest) {
             citationId,
             submittedByUserId: userId,
             // PDF-specific fields
-            sourceType: "pdf",
+            sourceType: "pdf" as const,
             sourceUrl: fileName,
             sourceSection: `chunk:${chunkNum}`,
-          } as any,
+          } as Parameters<typeof prisma.knowledgeItem.create>[0]["data"],
         });
 
         createdItems.push(item);
@@ -271,7 +271,7 @@ export async function POST(request: NextRequest) {
         citationId: item.citationId,
         title: item.title,
         domain: item.primaryDomain,
-        sourceSection: (item as any).sourceSection,
+        sourceSection: (item as any).sourceSection || "unknown",
       })),
     });
   } catch (error) {
