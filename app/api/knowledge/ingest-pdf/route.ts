@@ -3,8 +3,17 @@ import prisma from "@/lib/db";
 import { getUserFromRequest, unauthorized } from "@/lib/api-auth";
 import { generateCitationId, generateSlug } from "@/lib/kb";
 
-// pdf-parse import with dynamic require to avoid TypeScript issues
-const pdfParse = require("pdf-parse");
+// Use require to avoid TypeScript resolution issues with pdf-parse
+// This will be called at runtime
+function getPdfParser() {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require("pdf-parse");
+  } catch (e) {
+    console.error("Failed to load pdf-parse:", e);
+    throw new Error(`PDF parser not available: ${e}`);
+  }
+}
 
 // Helper: chunk text with overlap
 function chunkText(
@@ -63,7 +72,17 @@ export async function POST(request: NextRequest) {
     const userId = user.id;
 
     // Parse multipart form data
-    const formData = await request.formData();
+    let formData;
+    try {
+      formData = await request.formData();
+    } catch (error) {
+      console.error("FormData parse error:", error);
+      return NextResponse.json(
+        { error: "Invalid form data" },
+        { status: 400 }
+      );
+    }
+
     const file = formData.get("file") as File | null;
 
     if (!file) {
@@ -91,16 +110,37 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert file to buffer
-    const buffer = Buffer.from(await file.arrayBuffer());
+    let buffer;
+    try {
+      buffer = Buffer.from(await file.arrayBuffer());
+    } catch (error) {
+      console.error("File buffer error:", error);
+      return NextResponse.json(
+        { error: "Failed to read file" },
+        { status: 400 }
+      );
+    }
 
-    // Extract text from PDF
+    // Get PDF parser
+    let pdfParse;
+    try {
+      pdfParse = getPdfParser();
+    } catch (error) {
+      console.error("Failed to load PDF parser:", error);
+      return NextResponse.json(
+        { error: "PDF parser initialization failed" },
+        { status: 500 }
+      );
+    }
+
+    // Extract text from PDF using pdf-parse
     let pdfData;
     try {
       pdfData = await pdfParse(buffer);
     } catch (error) {
       console.error("PDF parsing error:", error);
       return NextResponse.json(
-        { error: "Failed to parse PDF file" },
+        { error: `Failed to parse PDF: ${error instanceof Error ? error.message : String(error)}` },
         { status: 400 }
       );
     }
@@ -137,11 +177,11 @@ export async function POST(request: NextRequest) {
     const domainCounts: Record<string, number> = {};
 
     for (let i = 0; i < chunks.length; i++) {
-      const chunkText = chunks[i];
+      const chunkContent = chunks[i];
       const chunkNum = i + 1;
 
       // Infer domain for this specific chunk
-      const chunkDomain = inferDomainFromText(chunkText);
+      const chunkDomain = inferDomainFromText(chunkContent);
       domainCounts[chunkDomain] = (domainCounts[chunkDomain] || 0) + 1;
 
       // Generate title
@@ -156,7 +196,7 @@ export async function POST(request: NextRequest) {
             scopeType: "GLOBAL",
             title,
             slug,
-            contentText: chunkText,
+            contentText: chunkContent,
             language: "EN",
             tags: JSON.stringify(["pdf-ingest", fileName]),
             primaryDomain: chunkDomain,
@@ -188,24 +228,29 @@ export async function POST(request: NextRequest) {
     }
 
     // Write audit log
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        actionType: "KB_INGEST_PDF",
-        entityType: "KnowledgeItem",
-        detailsJson: JSON.stringify({
-          fileName: file.name,
-          originalFileName: fileName,
-          totalChunks: chunks.length,
-          createdItems: createdItems.length,
-          inferredDomain,
-          domainCounts,
-          itemIds: createdItems.map((item) => item.id),
-          textLength: extractedText.length,
-          pdfPages: pdfData.numpages || "unknown",
-        }),
-      },
-    });
+    try {
+      await prisma.auditLog.create({
+        data: {
+          userId,
+          actionType: "KB_INGEST_PDF",
+          entityType: "KnowledgeItem",
+          detailsJson: JSON.stringify({
+            fileName: file.name,
+            originalFileName: fileName,
+            totalChunks: chunks.length,
+            createdItems: createdItems.length,
+            inferredDomain,
+            domainCounts,
+            itemIds: createdItems.map((item) => item.id),
+            textLength: extractedText.length,
+            pdfPages: pdfData.numpages || "unknown",
+          }),
+        },
+      });
+    } catch (auditError) {
+      console.error("Audit log error:", auditError);
+      // Don't fail the response if audit log fails
+    }
 
     return NextResponse.json({
       ok: true,
@@ -226,7 +271,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("PDF ingest error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { 
+        error: `Internal server error: ${error instanceof Error ? error.message : String(error)}`,
+        details: error instanceof Error ? error.stack : undefined
+      },
       { status: 500 }
     );
   }
