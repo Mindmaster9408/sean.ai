@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 
 const DOMAINS = [
@@ -45,11 +45,7 @@ export default function KnowledgePage() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfMessage, setPdfMessage] = useState("");
 
-  useEffect(() => {
-    loadItems();
-  }, [status, layer, primaryDomain, secondaryDomain]);
-
-  const loadItems = async () => {
+  const loadItems = useCallback(async () => {
     setLoading(true);
     try {
       let url = `/api/knowledge/list?status=${status}`;
@@ -69,11 +65,15 @@ export default function KnowledgePage() {
         setItems(data);
       }
     } catch (error) {
-      console.error("Failed to load knowledge items:", error);
+      console.error("Failed to load items:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [status, layer, primaryDomain, secondaryDomain]);
+
+  useEffect(() => {
+    loadItems();
+  }, [loadItems]);
 
   const handleApprove = async (itemId: string) => {
     try {
@@ -347,6 +347,7 @@ export default function KnowledgePage() {
                 Status
               </label>
               <select
+                title="Filter by status"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as "pending" | "approved" | "rejected" | "all")}
                 className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -363,6 +364,7 @@ export default function KnowledgePage() {
                 Layer
               </label>
               <select
+                title="Filter by layer"
                 value={layer}
                 onChange={(e) => setLayer(e.target.value)}
                 className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -379,6 +381,7 @@ export default function KnowledgePage() {
                 Primary Domain
               </label>
               <select
+                title="Filter by primary domain"
                 value={primaryDomain}
                 onChange={(e) => setPrimaryDomain(e.target.value)}
                 className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -397,6 +400,7 @@ export default function KnowledgePage() {
                 Secondary Domain
               </label>
               <select
+                title="Filter by secondary domain"
                 value={secondaryDomain}
                 onChange={(e) => setSecondaryDomain(e.target.value)}
                 className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"

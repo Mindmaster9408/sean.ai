@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "@/app/providers";
@@ -30,14 +30,28 @@ export default function ChatPage() {
   const [renameModal, setRenameModal] = useState<{ conversationId: string; newTitle: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [debugMode, setDebugMode] = useState(false);
-  const [lastReasonDebug, setLastReasonDebug] = useState<any>(null);
-  const [lastActions, setLastActions] = useState<any[]>([]);
+  const [lastReasonDebug, setLastReasonDebug] = useState<Record<string, unknown> | null>(null);
+  const [lastActions, setLastActions] = useState<Record<string, unknown>[]>([]);
   const [approvedActionIds, setApprovedActionIds] = useState<Set<string>>(new Set());
 
+  const loadConversations = useCallback(async () => {
+    try {
+      const res = await fetch("/api/chat/conversations");
+      if (res.ok) {
+        const data = await res.json();
+        setConversations(data);
+        if (data.length > 0 && !currentConversation) {
+          setCurrentConversation(data[0]);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load conversations:", error);
+    }
+  }, [currentConversation]);
 
   useEffect(() => {
     loadConversations();
-  }, []);
+  }, [loadConversations]);
 
   useEffect(() => {
     if (currentConversation) {
@@ -51,21 +65,6 @@ export default function ChatPage() {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const loadConversations = async () => {
-    try {
-      const res = await fetch("/api/chat/conversations");
-      if (res.ok) {
-        const data = await res.json();
-        setConversations(data);
-        if (data.length > 0 && !currentConversation) {
-          setCurrentConversation(data[0]);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to load conversations:", error);
-    }
   };
 
   const loadMessages = async (conversationId: string) => {
@@ -178,7 +177,7 @@ export default function ChatPage() {
     }
   };
 
-  const approveAction = async (action: any) => {
+  const approveAction = async (action: Record<string, unknown>) => {
     try {
       const res = await fetch("/api/actions/approve", {
         method: "POST",
@@ -192,7 +191,7 @@ export default function ChatPage() {
       });
 
       if (res.ok) {
-        setApprovedActionIds(new Set([...approvedActionIds, action.id]));
+        setApprovedActionIds(new Set([...approvedActionIds, String(action.id || "")]));
         console.log("Action approved:", action.id);
       } else {
         const error = await res.json();
@@ -203,7 +202,7 @@ export default function ChatPage() {
     }
   };
 
-  const rejectAction = async (action: any, note?: string) => {
+  const rejectAction = async (action: Record<string, unknown>, note?: string) => {
     try {
       const res = await fetch("/api/actions/reject", {
         method: "POST",
@@ -218,7 +217,7 @@ export default function ChatPage() {
       });
 
       if (res.ok) {
-        setApprovedActionIds(new Set([...approvedActionIds, action.id])); // Disable buttons after reject too
+        setApprovedActionIds(new Set([...approvedActionIds, String(action.id || "")])); // Disable buttons after reject too
         console.log("Action rejected:", action.id);
       } else {
         const error = await res.json();
@@ -380,9 +379,12 @@ export default function ChatPage() {
               Language
             </label>
             <select
+              id="language-select"
+              title="Select language"
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
               className="w-full px-2 py-1 bg-slate-800 border border-slate-600 text-white rounded text-sm"
+              aria-label="Language"
             >
               <option value="EN">English</option>
               <option value="AF">Afrikaans</option>
@@ -444,21 +446,27 @@ export default function ChatPage() {
                     <div className="mt-6 pt-4 border-t border-slate-300 bg-blue-50 rounded-lg p-4">
                       <div className="text-sm font-semibold text-slate-800 mb-3">Proposed Actions</div>
                       <div className="space-y-2">
-                        {lastActions.map((action) => (
-                          <div
-                            key={action.id}
-                            className="bg-white border border-blue-200 rounded-lg p-3 flex items-start gap-3"
-                          >
-                            <div className="flex-1">
-                              <div className="font-medium text-slate-900 text-sm">{action.title}</div>
-                              <div className="text-xs text-slate-600 mt-1">{action.summary}</div>
-                              {action.confidence && (
-                                <div className="text-xs text-slate-500 mt-1">
-                                  Confidence: {(action.confidence * 100).toFixed(0)}%
-                                </div>
-                              )}
-                            </div>
-                            {action.requiresApproval && !approvedActionIds.has(action.id) && (
+                        {lastActions.map((action) => {
+                          const actionId = String(action.id || "");
+                          const actionTitle = String(action.title || "Unknown");
+                          const actionSummary = String(action.summary || "");
+                          const actionConfidence = typeof action.confidence === "number" ? action.confidence : null;
+                          const requiresApproval = Boolean(action.requiresApproval);
+                          return (
+                            <div
+                              key={actionId}
+                              className="bg-white border border-blue-200 rounded-lg p-3 flex items-start gap-3"
+                            >
+                              <div className="flex-1">
+                                <div className="font-medium text-slate-900 text-sm">{actionTitle}</div>
+                                <div className="text-xs text-slate-600 mt-1">{actionSummary}</div>
+                                {actionConfidence !== null && (
+                                  <div className="text-xs text-slate-500 mt-1">
+                                    Confidence: {(actionConfidence * 100).toFixed(0)}%
+                                  </div>
+                                )}
+                              </div>
+                              {requiresApproval && !approvedActionIds.has(actionId) && (
                               <div className="flex gap-2 flex-shrink-0">
                                 <button
                                   onClick={() => approveAction(action)}
@@ -474,13 +482,14 @@ export default function ChatPage() {
                                 </button>
                               </div>
                             )}
-                            {approvedActionIds.has(action.id) && (
+                            {approvedActionIds.has(actionId) && (
                               <div className="text-xs text-slate-500 flex-shrink-0">
                                 Processed
                               </div>
                             )}
                           </div>
-                        ))}
+                        );
+                        })})
                       </div>
                     </div>
                   )}
@@ -505,12 +514,15 @@ export default function ChatPage() {
             <form onSubmit={sendMessage} className="border-t border-slate-200 p-4 bg-white">
               <div className="flex gap-2">
                 <input
+                  id="message-input"
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder={t("chat.placeholder", language)}
+                  title="Type your message here"
                   className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   disabled={loading}
+                  aria-label="Message input"
                 />
                 <button
                   type="submit"
@@ -543,6 +555,7 @@ export default function ChatPage() {
           <div className="bg-white rounded-lg p-6 w-96 shadow-lg">
             <h2 className="text-lg font-bold mb-4 text-slate-900">Rename Conversation</h2>
             <input
+              id="rename-input"
               type="text"
               value={renameModal.newTitle}
               onChange={(e) => setRenameModal({ ...renameModal, newTitle: e.target.value })}
@@ -550,8 +563,10 @@ export default function ChatPage() {
                 if (e.key === "Enter") submitRename();
                 if (e.key === "Escape") setRenameModal(null);
               }}
+              title="Enter new conversation name"
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4 text-slate-900"
               autoFocus
+              aria-label="Conversation name"
             />
             <div className="flex gap-2 justify-end">
               <button
