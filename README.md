@@ -49,6 +49,31 @@ The app will be available at: **http://localhost:3000**
 
 Navigate to http://localhost:3000 and log in with one of the allowlisted emails.
 
+## 🚀 Quick Deploy to Production
+
+### Deploy to Zeabur (Recommended)
+
+The fastest way to deploy Sean to production:
+
+1. **Push your code to GitHub** (if not already done)
+2. **Sign up at [zeabur.com](https://zeabur.com)** and connect your GitHub account
+3. **Create a new project** and deploy from your GitHub repository
+4. **Set environment variables** in Zeabur dashboard:
+   - `DATABASE_URL` - Use Zeabur's PostgreSQL service or SQLite
+   - `SESSION_SECRET` - A random 32+ character string
+   - `NEXT_PUBLIC_APP_URL` - Your Zeabur domain
+
+Zeabur will automatically detect the Next.js app and deploy it with zero configuration. For detailed instructions, see [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md).
+
+**Alternative deployment options:**
+- Vercel
+- Self-hosted VPS
+- Docker
+
+See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for complete deployment instructions for all platforms.
+
+---
+
 ## LAN Testing (Phone/Tablet Access)
 
 To test the app on a phone or tablet on the same WiFi network:
