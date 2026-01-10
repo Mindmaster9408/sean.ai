@@ -47,7 +47,67 @@ git push -u origin main
 
 ### Step 3: Choose Deployment Platform
 
-#### 🎯 **Option A: Vercel** (Easiest, Free Tier Available)
+#### 🎯 **Option A: Zeabur** (Recommended, Easy & Modern)
+
+[Zeabur](https://zeabur.com) is a modern cloud platform that automatically detects and deploys Next.js applications with zero configuration.
+
+**Quick Deployment Steps:**
+
+1. **Push to GitHub** (if not already done):
+   ```bash
+   git push -u origin main
+   ```
+
+2. **Sign up at [zeabur.com](https://zeabur.com)** and authorize GitHub access
+
+3. **Create a new project:**
+   - Click "Create Project"
+   - Select your preferred deployment region
+   - Click "Deploy Service" → "Deploy from GitHub"
+   - Select the `sean-webapp` repository
+
+4. **Configure Environment Variables:**
+   
+   Zeabur will auto-detect Next.js. Add these environment variables in the Zeabur dashboard:
+   
+   | Variable | Value | Description |
+   |----------|-------|-------------|
+   | `DATABASE_URL` | `file:./prisma/dev.db` | SQLite for testing, or use Zeabur's PostgreSQL service |
+   | `SESSION_SECRET` | (generate random 32+ chars) | Session encryption key |
+   | `NEXT_PUBLIC_APP_URL` | `https://your-app.zeabur.app` | Your Zeabur domain |
+
+5. **Optional: Add PostgreSQL Database**
+   
+   For production, PostgreSQL is recommended over SQLite:
+   - In Zeabur dashboard, click "Add Service" → "PostgreSQL"
+   - Zeabur auto-generates `DATABASE_URL` environment variable
+   - Update `prisma/schema.prisma` datasource provider to `"postgresql"`
+   - Commit and push to redeploy
+   - Note: This is a one-time production setup; local dev can still use SQLite
+
+6. **Deploy:**
+   - Zeabur automatically builds and deploys
+   - Your app will be live at `https://your-app.zeabur.app`
+   - You can add a custom domain in settings
+
+**Zeabur Features:**
+- ✅ Automatic HTTPS/SSL
+- ✅ Auto-deployment on git push
+- ✅ Built-in PostgreSQL, Redis, MySQL services
+- ✅ Zero-downtime deployments
+- ✅ Easy rollback to previous versions
+- ✅ Free tier available
+- ✅ Optimized for Next.js (auto-detects config)
+
+**Configuration Files:**
+- `zbpack.json` - Custom build/start commands (already included)
+- `.env.example` - Environment variable template
+
+**📘 Detailed Zeabur Guide:** See [ZEABUR_DEPLOY.md](./ZEABUR_DEPLOY.md) for complete step-by-step instructions, troubleshooting, and advanced configuration options.
+
+---
+
+#### 🌐 **Option B: Vercel** (Alternative, Free Tier Available)
 
 1. Go to [vercel.com](https://vercel.com)
 2. Sign in with GitHub
@@ -61,7 +121,7 @@ git push -u origin main
 
 **Vercel handles scaling and SSL automatically.**
 
-#### 🏠 **Option B: Self-Hosted VPS** (Ubuntu/Debian)
+#### 🏠 **Option C: Self-Hosted VPS** (Ubuntu/Debian)
 
 1. **Rent a VPS** from Linode, DigitalOcean, or Hetzner
 2. **SSH into your server:**
@@ -162,7 +222,7 @@ git push -u origin main
     - Add it to GitHub Deploy Keys (Settings → Deploy Keys)
     - GitHub Actions will auto-deploy via the workflow in `.github/workflows/deploy.yml`
 
-#### 🐳 **Option C: Docker Deployment** (Scalable)
+#### 🐳 **Option D: Docker Deployment** (Scalable)
 
 1. **Create Dockerfile** (already included in project)
 2. **Deploy to:**
