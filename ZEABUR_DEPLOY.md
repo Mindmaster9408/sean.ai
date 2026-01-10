@@ -52,9 +52,12 @@ DATABASE_URL=file:./prisma/dev.db
 ```
 
 **Option B: Add PostgreSQL (Production Recommended)**
+
+For production deployments, PostgreSQL is recommended over SQLite for better concurrency and scalability.
+
 1. In Zeabur dashboard, click **"Add Service"** → **"PostgreSQL"**
-2. Zeabur will automatically create and inject `DATABASE_URL`
-3. Update `prisma/schema.prisma`:
+2. Zeabur will automatically create the database and inject `DATABASE_URL` environment variable
+3. Update `prisma/schema.prisma` to use PostgreSQL:
    ```prisma
    datasource db {
      provider = "postgresql"  // Changed from "sqlite"
@@ -62,6 +65,8 @@ DATABASE_URL=file:./prisma/dev.db
    }
    ```
 4. Commit and push the change to trigger a rebuild
+
+**Note:** This is a one-time setup for production. Your local development environment can continue using SQLite. Consider using separate branches or environment-based configuration if you need to support both providers simultaneously.
 
 #### Optional Variables:
 

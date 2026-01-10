@@ -78,11 +78,12 @@ git push -u origin main
 
 5. **Optional: Add PostgreSQL Database**
    
-   For production, use PostgreSQL instead of SQLite:
+   For production, PostgreSQL is recommended over SQLite:
    - In Zeabur dashboard, click "Add Service" → "PostgreSQL"
    - Zeabur auto-generates `DATABASE_URL` environment variable
    - Update `prisma/schema.prisma` datasource provider to `"postgresql"`
-   - Redeploy the app
+   - Commit and push to redeploy
+   - Note: This is a one-time production setup; local dev can still use SQLite
 
 6. **Deploy:**
    - Zeabur automatically builds and deploys
