@@ -1,25 +1,26 @@
-# Sean - AI Knowledge Layer
+# Sean AI - Intelligent Accounting Assistant
 
-**Phase 0**: Knowledge-first foundation with strict governance, citations, and bilingual support (Afrikaans/English).
+**Phase 1**: Bootstrap learning with external LLM APIs, bank allocation learning, and natural language chat.
 
 ## Overview
 
-Sean is a standalone AI webapp that provides a shared AI/knowledge layer for the Lorenco ecosystem. In Phase 0, Sean is primarily a knowledge seeding and governed reasoning assistant.
+Sean AI is a standalone AI webapp that serves as an intelligent accounting assistant for the Lorenco ecosystem. It features:
 
-**Access is restricted to three allowlisted emails:**
-- ruanvlog@lorenco.co.za
-- antonjvr@lorenco.co.za
-- mj@lorenco.co.za
+- **Bootstrap Learning**: Ask questions naturally - Sean checks the knowledge base first, and if no answer exists, calls an external LLM (Claude/OpenAI/Grok) ONCE and stores the answer for future reuse.
+- **Bank Allocations**: Import transactions and let Sean suggest categories. Correct Sean's suggestions and he learns your patterns.
+- **Knowledge Base**: Teach Sean facts, rules, and procedures. All knowledge is stored locally with full audit trails.
+- **South African Focus**: Built for SA tax (VAT, Income Tax, Company Tax, Payroll, etc.) and accounting practices.
 
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router) with TypeScript
-- **Styling**: Tailwind CSS
+- **Styling**: Tailwind CSS 4
 - **Database**: SQLite with Prisma ORM
-- **Authentication**: Session-based with email allowlist
+- **Authentication**: Session-based with dynamic email allowlist
 - **Language Support**: English (EN) and Afrikaans (AF)
+- **LLM Integration**: Claude, OpenAI, or Grok (configurable)
 
-## Run Instructions
+## Quick Start
 
 ### 1. Install Dependencies
 
@@ -27,118 +28,185 @@ Sean is a standalone AI webapp that provides a shared AI/knowledge layer for the
 npm install
 ```
 
-### 2. Set Up Database
+### 2. Configure Environment
 
-The `.env` file is already configured. Run the Prisma migration:
+Copy `.env.example` to `.env` and configure:
+
+```env
+# Database
+DATABASE_URL="file:./prisma/dev.db"
+
+# LLM Bootstrap (required for natural language Q&A)
+LLM_PROVIDER="CLAUDE"  # Options: CLAUDE, OPENAI, GROK
+LLM_API_KEY="your-api-key-here"
+```
+
+### 3. Set Up Database
 
 ```bash
 npx prisma migrate dev
 ```
 
-This creates the SQLite database with all required tables.
-
-### 3. Start Development Server
+### 4. Start Development Server
 
 ```bash
 npm run dev
 ```
 
-The app will be available at: **http://localhost:3000**
+Access at: **http://localhost:3000**
 
-### 4. Login
+### 5. Login
 
-Navigate to http://localhost:3000 and log in with one of the allowlisted emails.
+Use one of the authorized emails:
+- ruanvlog@lorenco.co.za
+- antonjvr@lorenco.co.za
+- mj@lorenco.co.za
 
-## LAN Testing (Phone/Tablet Access)
+## Features
 
-To test the app on a phone or tablet on the same WiFi network:
+### Chat Interface
+- **Natural Language**: Just ask questions - no special prefixes needed
+- **Bootstrap Learning**: Unknown answers are fetched from external LLM and cached
+- **Teach Mode**: Use `TEACH:` prefix to add knowledge
+- **ASK Mode**: Use `ASK:` prefix for explicit knowledge base queries
 
-### 1. Find Your LAN IP Address
+### Bank Allocations (`/allocations`)
+- Import transactions (CSV/paste)
+- Sean suggests categories based on learned patterns
+- Confirm or correct allocations
+- "Teach Sean" - explain corrections for better learning
+- View learning statistics
 
-**Windows (PowerShell):**
-```powershell
-ipconfig
+### Knowledge Base (`/knowledge`)
+- View all knowledge items (pending/approved/rejected)
+- Approve or reject submissions
+- Ingest from PDFs or SARS website
+- Content preview with expandable details
+
+### Audit Logs (`/admin/audit`)
+- Complete action history
+- Filter by action type
+- Track all user activities
+
+## Key Concepts
+
+### Bootstrap Learning Flow
+
 ```
-Look for "IPv4 Address" under your active network (e.g., 192.168.0.27)
-
-**macOS/Linux (Terminal):**
-```bash
-ifconfig | grep "inet " | grep -v 127.0.0.1
+User asks question
+       ↓
+Check knowledge base (exact match via hash)
+       ↓
+Check knowledge base (keyword match)
+       ↓
+If no match: Call external LLM ONCE
+       ↓
+Store response in KB (auto-approved)
+       ↓
+Return answer with citation
 ```
 
-### 2. Access from Phone
+Future identical questions use the cached answer - no repeated API calls.
 
-Open a browser on your phone and navigate to:
+### Bank Allocation Learning
+
 ```
-http://192.168.0.27:3000
+Transaction: "ATM FEE R15.00"
+       ↓
+Sean suggests: "BANK_CHARGES" (keyword match)
+       ↓
+User confirms or corrects
+       ↓
+Pattern learned: "atm fee" → BANK_CHARGES
+       ↓
+Future "ATM FEE R25.00" auto-suggests correctly
 ```
-(Replace 192.168.0.27 with your actual LAN IP)
 
-### 3. Windows Firewall
+The system learns from corrections and builds confidence over time.
 
-If the app is not accessible from the phone, allow Node.js through Windows Firewall:
-1. Open **Windows Defender Firewall** > **Allow an app through firewall**
-2. Find **Node.js** in the list and ensure **Private networks** is checked
-3. Restart the dev server: `npm run dev`
+### Knowledge Layers
 
-### 4. Session Persistence
+- **LEGAL**: Regulatory rules (SARS, tax tables, laws)
+- **FIRM**: Lorenco-specific procedures and policies
+- **CLIENT**: Client-specific information
 
-Login on the phone. The session cookie should persist across page refreshes and navigation.
+### Knowledge Domains
+
+- VAT (Value Added Tax)
+- INCOME_TAX (Personal income tax)
+- COMPANY_TAX (Corporate tax)
+- PAYROLL (Salaries, PAYE, UIF)
+- CAPITAL_GAINS_TAX
+- WITHHOLDING_TAX
+- ACCOUNTING_GENERAL
+- OTHER
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/chat/messages` | POST | Send message (handles teach/ask/natural) |
+| `/api/knowledge/submit` | POST | Submit knowledge item |
+| `/api/knowledge/list` | GET | List knowledge items |
+| `/api/knowledge/approve` | POST | Approve pending item |
+| `/api/reason` | POST | Query knowledge base |
+| `/api/allocations/suggest` | POST | Get allocation suggestion |
+| `/api/allocations/learn` | POST | Learn from correction |
+| `/api/allocations/transactions` | GET/POST | Manage transactions |
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | SQLite database path |
+| `LLM_PROVIDER` | No* | CLAUDE, OPENAI, or GROK |
+| `LLM_API_KEY` | No* | API key for LLM provider |
+| `NEXTAUTH_URL` | No | Base URL for production |
+
+*Required for bootstrap learning (natural language answers)
+
+## Deployment
+
+### Vercel (Recommended)
+
+1. Push to GitHub
+2. Connect repo to Vercel
+3. Add environment variables in Vercel dashboard
+4. Deploy
+
+Note: For production, consider migrating from SQLite to PostgreSQL:
+```env
+DATABASE_URL="postgresql://user:pass@host:5432/seanai"
+```
+
+### LAN Testing
+
+To access from phone/tablet on same network:
+
+1. Find your IP: `ipconfig` (Windows) or `ifconfig` (Mac/Linux)
+2. Access: `http://YOUR_IP:3000`
+3. Ensure Node.js is allowed through firewall
+
+## Roadmap
+
+### Phase 1 (Current)
+- [x] Bootstrap learning with external LLM
+- [x] Bank allocation module
+- [x] Natural language chat
+- [x] Dynamic email allowlist
+
+### Phase 2 (Planned)
+- [ ] Embeddings for semantic search
+- [ ] VAT calculation module
+- [ ] Journal entry creation
+- [ ] Multi-tenant support
+
+### Phase 3 (Future)
+- [ ] Integration with Lorenco Accounting
+- [ ] Batch transaction processing
+- [ ] Report generation
+- [ ] Mobile app
 
 ---
 
-## Testing Checklist (Phase 0 Acceptance Criteria)
-
-### Authentication & Access Control
-- [ ] Only the 3 allowlisted emails can access the app
-- [ ] Invalid emails receive access denied error
-- [ ] Session persists after page refresh
-- [ ] Logout works correctly
-
-### Teach Mode
-- [ ] LEER:/TEACH:/SAVE TO KNOWLEDGE: creates PENDING knowledge item
-- [ ] Citation ID generated correctly (KB:LAYER:slug:v1)
-- [ ] Assistant acknowledges with citation reference
-- [ ] Metadata parsing works (LAYER, TAGS, TITLE, etc.)
-
-### Knowledge Admin
-- [ ] Filter by status works
-- [ ] Approve/Reject buttons work
-- [ ] Status updates persist
-
-### Reasoning (ASK: queries)
-- [ ] ASK: queries use ONLY APPROVED knowledge
-- [ ] Response includes citations
-- [ ] Uncertainty stated when no knowledge found
-
-### Audit Logging
-- [ ] All actions logged (login, teach, approve, reject, reasoning)
-- [ ] Audit page displays logs correctly
-
-### Bilingual Support
-- [ ] Language toggle works
-- [ ] UI labels update in AF/EN
-
-## Phase 0 Features
-
-**ACTIVE:**
-- Allowlist authentication
-- Chat UI with conversations
-- Teach Mode (LEER:/TEACH:/SAVE TO KNOWLEDGE:)
-- Knowledge governance (approve/reject)
-- Governed reasoning with citations
-- Layered knowledge (LEGAL/FIRM/CLIENT)
-- Client scope separation
-- Audit logging
-- Bilingual UI (AF/EN)
-
-**PLANNED (Not in Phase 0):**
-- External AI API calls
-- Website crawling
-- Tool/action framework
-- Embeddings/vector search
-- Other app integrations
-
----
-
-**Built for Lorenco** | Phase 0 - January 2026
+**Built for Lorenco** | Sean AI v1.0 - January 2026

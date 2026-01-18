@@ -18,6 +18,7 @@ interface KnowledgeItem {
   id: string;
   citationId: string;
   title: string;
+  contentText: string;
   layer: string;
   status: string;
   kbVersion: number;
@@ -25,6 +26,8 @@ interface KnowledgeItem {
   approvedAt?: string;
   primaryDomain: string;
   secondaryDomains: string;
+  sourceType?: string;
+  sourceUrl?: string;
   submittedBy: { email: string };
 }
 
@@ -464,10 +467,31 @@ export default function KnowledgePage() {
                       </div>
                     )}
                     <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
+
+                    {/* Content Preview */}
+                    {item.contentText && (
+                      <details className="mb-3">
+                        <summary className="text-sm font-medium cursor-pointer hover:text-blue-600 transition">
+                          View Content ({item.contentText.length} chars)
+                        </summary>
+                        <div className="mt-2 p-3 bg-white bg-opacity-50 rounded-lg text-sm whitespace-pre-wrap max-h-48 overflow-y-auto">
+                          {item.contentText}
+                        </div>
+                      </details>
+                    )}
+
                     <p className="text-sm opacity-75 mb-2">
                       Submitted by {item.submittedBy.email}
                       {" on "}
                       {new Date(item.createdAt).toLocaleDateString()}
+                      {item.sourceType && (
+                        <span className="ml-2">
+                          · Source: {item.sourceType}
+                          {item.sourceUrl && (
+                            <span className="text-xs ml-1">({item.sourceUrl.substring(0, 40)}...)</span>
+                          )}
+                        </span>
+                      )}
                     </p>
                   </div>
 

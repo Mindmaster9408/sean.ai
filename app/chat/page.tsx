@@ -123,52 +123,47 @@ export default function ChatPage() {
           data.assistantMessage,
         ]);
 
-        // Call /api/reason to get actions and debug info
-        try {
-          const reasonRes = await fetch("/api/reason", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              question: userMessage,
-              clientId: null,
-              layer: null,
-            }),
-          });
+        // Store metadata from response (now includes bootstrap info)
+        if (data.metadata) {
+          console.log("RESPONSE_METADATA", data.metadata);
 
-          if (reasonRes.ok) {
-            const reasonData = await reasonRes.json();
-            setLastActions(reasonData.actions || []);
-            if (debugMode) {
-              setLastReasonDebug(reasonData.debug || null);
-            } else {
-              setLastReasonDebug(null);
-            }
-            console.log("REASON_RESPONSE", reasonData);
+          // Set debug info if available and debug mode is on
+          if (debugMode && data.metadata) {
+            setLastReasonDebug(data.metadata);
+          } else {
+            setLastReasonDebug(null);
           }
-        } catch (reasonError) {
-          console.error("Reason call failed:", reasonError);
         }
-      }
 
-      // Call action preview endpoint (Phase 2A)
-      try {
-        const previewRes = await fetch("/api/ai/actions/preview", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            question: userMessage,
-            clientId: null,
-            layer: null,
-            debugMode,
-          }),
-        });
+        // Only call reason endpoint for ASK: prefixed messages (optional enhancement)
+        // The main processing is now done in /api/chat/messages
+        if (userMessage.toUpperCase().startsWith("ASK:")) {
+          try {
+            const reasonRes = await fetch("/api/reason", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                question: userMessage.substring(4).trim(),
+                clientId: null,
+                layer: null,
+              }),
+            });
 
-        if (previewRes.ok) {
-          const previewJson = await previewRes.json();
-          console.log("ACTIONS_PREVIEW", previewJson);
+            if (reasonRes.ok) {
+              const reasonData = await reasonRes.json();
+              setLastActions(reasonData.actions || []);
+              if (debugMode) {
+                setLastReasonDebug(reasonData.debug || null);
+              }
+              console.log("REASON_RESPONSE", reasonData);
+            }
+          } catch (reasonError) {
+            console.error("Reason call failed:", reasonError);
+          }
+        } else {
+          // Clear actions for non-ASK messages
+          setLastActions([]);
         }
-      } catch (previewError) {
-        console.error("Action preview call failed:", previewError);
       }
     } catch (error) {
       console.error("Failed to send message:", error);
@@ -390,14 +385,29 @@ export default function ChatPage() {
               <option value="AF">Afrikaans</option>
             </select>
           </div>
+          <Link href="/dashboard" className="block px-3 py-2 rounded-lg hover:bg-slate-700 transition text-sm">
+            📊 Dashboard
+          </Link>
           <Link href="/knowledge" className="block px-3 py-2 rounded-lg hover:bg-slate-700 transition text-sm">
-             {t("chat.knowledge", language)}
+            📚 {t("chat.knowledge", language)}
+          </Link>
+          <Link href="/allocations" className="block px-3 py-2 rounded-lg hover:bg-slate-700 transition text-sm">
+            🏦 Bank Allocations
+          </Link>
+          <Link href="/admin/agent" className="block px-3 py-2 rounded-lg hover:bg-slate-700 transition text-sm">
+            🤖 Sean Agent Control
+          </Link>
+          <Link href="/admin/users" className="block px-3 py-2 rounded-lg hover:bg-slate-700 transition text-sm">
+            👥 User Management
+          </Link>
+          <Link href="/admin/audit" className="block px-3 py-2 rounded-lg hover:bg-slate-700 transition text-sm">
+            📋 Audit Logs
           </Link>
           <button
             onClick={handleLogout}
             className="w-full px-3 py-2 text-left rounded-lg hover:bg-red-600 transition text-sm"
           >
-             {t("action.logout", language)}
+            🚪 {t("action.logout", language)}
           </button>
         </div>
       </div>

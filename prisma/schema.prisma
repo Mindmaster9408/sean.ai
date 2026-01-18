@@ -12,11 +12,14 @@ model User {
   email     String   @unique
   createdAt DateTime @default(now())
 
-  sessions          Session[]
-  conversations     Conversation[]
-  knowledgeItems    KnowledgeItem[] @relation("submittedBy")
-  approvedItems     KnowledgeItem[] @relation("approvedBy")
-  auditLogs         AuditLog[]
+  sessions           Session[]
+  conversations      Conversation[]
+  knowledgeItems     KnowledgeItem[] @relation("submittedBy")
+  approvedItems      KnowledgeItem[] @relation("approvedBy")
+  auditLogs          AuditLog[]
+  bankTransactions   BankTransaction[]
+  allocationRules    AllocationRule[]
+  confirmedAllocations BankTransaction[] @relation("confirmedBy")
 }
 
 model Session {
@@ -87,8 +90,8 @@ model AuditLog {
   id          String   @id @default(cuid())
   userId      String?
   user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  actionType  String   // LOGIN | LOGOUT | MESSAGE_SEND | KB_SUBMIT | KB_APPROVE | KB_REJECT | REASON_QUERY
-  entityType  String? // Conversation | Message | KnowledgeItem | None
+  actionType  String   // LOGIN | LOGOUT | MESSAGE_SEND | KB_SUBMIT | KB_APPROVE | KB_REJECT | REASON_QUERY | LLM_BOOTSTRAP | ALLOCATION_LEARN | ALLOCATION_REINFORCE
+  entityType  String? // Conversation | Message | KnowledgeItem | AllocationRule | BankTransaction | None
   entityId    String?
   detailsJson String? // JSON string with additional details
   createdAt   DateTime @default(now())
@@ -96,4 +99,178 @@ model AuditLog {
   @@index([actionType])
   @@index([userId])
   @@index([createdAt])
+}
+
+// Bank Transaction for allocation learning
+model BankTransaction {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date              DateTime
+  description       String   // Display description
+  rawDescription    String   // Original bank description
+  amount            Float
+  isDebit           Boolean  @default(true)
+  suggestedCategory String?  // Sean's suggestion
+  suggestedConfidence Float?
+  confirmedCategory String?  // User's confirmed category
+  confirmedByUserId String?
+  confirmedBy       User?    @relation("confirmedBy", fields: [confirmedByUserId], references: [id], onDelete: SetNull)
+  feedback          String?  // User's explanation for correction (Teach Sean)
+  processed         Boolean  @default(false)
+  // Multi-tenant support
+  clientId          String?  // Optional client/company ID
+  client            Client?  @relation("clientTransactions", fields: [clientId], references: [id], onDelete: SetNull)
+  bankAccount       String?  // Bank account identifier
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+  @@index([confirmedCategory])
+  @@index([processed])
+  @@index([date])
+  @@index([clientId])
+}
+
+// Learned allocation rules
+model AllocationRule {
+  id                String   @id @default(cuid())
+  pattern           String   // Original description that created this rule
+  normalizedPattern String   // Lowercase, simplified for matching
+  category          String   // The allocation category code
+  confidence        Float    @default(0.7)
+  learnedFromCount  Int      @default(1) // How many times this was confirmed
+  createdByUserId   String?
+  createdBy         User?    @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  // Multi-tenant support
+  clientId          String?  // Optional client ID for client-specific rules
+  client            Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  isGlobal          Boolean  @default(true) // If true, applies to all clients
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([normalizedPattern])
+  @@index([category])
+  @@index([confidence])
+  @@index([clientId])
+  @@index([isGlobal])
+}
+
+// Client/Company for multi-tenant allocation rules
+model Client {
+  id                String   @id @default(cuid())
+  name              String
+  code              String   @unique // Short code for API calls
+  description       String?
+  isActive          Boolean  @default(true)
+
+  // Default allocation settings per client
+  defaultMinConfidence Float @default(0.8)
+  autoAllocateEnabled  Boolean @default(true)
+
+  // Relationships
+  allocationRules   AllocationRule[]
+  bankTransactions  BankTransaction[] @relation("clientTransactions")
+  customCategories  ClientCategory[]
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([code])
+  @@index([isActive])
+}
+
+// Custom categories per client (extends base categories)
+model ClientCategory {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  code        String   // Category code
+  label       String   // Display label
+  keywords    String   @default("[]") // JSON array of keywords
+  parentCode  String?  // Maps to base category if needed
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([clientId, code])
+  @@index([clientId])
+}
+
+// Allowed emails for login (dynamic allowlist)
+model AllowedEmail {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  role      String   @default("USER") // USER | ADMIN
+  addedBy   String?
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+// Sean Agent Status and Configuration
+model SeanAgent {
+  id                  String   @id @default(cuid())
+  name                String   @default("Sean") // Agent name
+  status              String   @default("INACTIVE") // ACTIVE | INACTIVE | PAUSED
+  authorizedActions   String   @default("[]") // JSON array: ["ALLOCATE", "RESPOND", "LEARN"]
+
+  // Auto-allocation settings
+  autoAllocateEnabled Boolean  @default(false)
+  autoAllocateInterval Int     @default(60) // Minutes between auto-allocation runs
+  autoAllocateMinConfidence Float @default(0.8) // Minimum confidence for auto-allocation
+  autoAllocateLastRun DateTime?
+  autoAllocateNextRun DateTime?
+
+  // API fallback settings
+  llmFallbackEnabled  Boolean  @default(true) // Call LLM when no match found
+  llmFallbackProvider String?  // claude | openai | grok
+
+  // Stats
+  totalAllocations    Int      @default(0)
+  totalLLMCalls       Int      @default(0)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([status])
+}
+
+// Auto-allocation job runs
+model AllocationJobRun {
+  id                  String   @id @default(cuid())
+  agentId             String
+  status              String   @default("RUNNING") // RUNNING | COMPLETED | FAILED
+  startedAt           DateTime @default(now())
+  completedAt         DateTime?
+
+  // Results
+  transactionsProcessed Int    @default(0)
+  autoAllocated       Int      @default(0)
+  llmAllocated        Int      @default(0)
+  needsReview         Int      @default(0)
+  errors              Int      @default(0)
+
+  detailsJson         String?  // JSON with full details
+  errorMessage        String?
+
+  @@index([agentId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+// Cached LLM allocation responses (bootstrap for allocations)
+model AllocationLLMCache {
+  id                  String   @id @default(cuid())
+  normalizedPattern   String   @unique // Normalized description
+  suggestedCategory   String
+  reasoning           String?  // LLM's reasoning
+  provider            String   // claude | openai | grok
+  confidence          Float    @default(0.7)
+  usedCount           Int      @default(1)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([normalizedPattern])
+  @@index([suggestedCategory])
 }
